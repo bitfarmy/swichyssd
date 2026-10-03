@@ -167,13 +167,6 @@ class SwichySSD(Gtk.Window):
         self.status.set_halign(Gtk.Align.START)
         vbox.append(self.status)
 
-        # --- Percorso attuale ---
-        self.path_lbl = Gtk.Label()
-        self.path_lbl.set_xalign(0)
-        self.path_lbl.set_halign(Gtk.Align.START)
-        self._update_path_label()
-        vbox.append(self.path_lbl)
-
         # --- sezione: disco interno ---
         vbox.append(self._title("Sul disco interno (dove le installa lo store)"))
         self.lista_interno = Gtk.ListBox()
@@ -211,16 +204,8 @@ class SwichySSD(Gtk.Window):
         self.conf_file = cfg["conf_file"]
         self.img_path = cfg.get("img_path", "")
         if refresh:
-            self._update_path_label()
             self.check_prerequisiti()
             self.aggiorna()
-
-    def _update_path_label(self):
-        img = self.img_path or "Non impostato"
-        txt = (f"<small><b>File immagine (disco esterno):</b> {img}\n"
-               f"<b>Percorso montato:</b> {self.programs_path}  |  "
-               f"<b>Installation:</b> {self.installation}</small>")
-        self.path_lbl.set_markup(txt)
 
     def _title(self, t):
         l = Gtk.Label()
