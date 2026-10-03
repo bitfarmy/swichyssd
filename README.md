@@ -14,6 +14,16 @@ con una custom installation di Flatpak (in italiano: niente complicazioni, solo 
 Viceversa, le app sull'SSD esterno hanno il bottone **"Sposta sul disco interno"**
 per quando devi usare il PC senza il disco.
 
+## Novita: Impostazioni
+
+Clicca il bottone **"Impostazioni"** in alto per:
+- Vedere il **percorso attuale** dove finiscono le app
+- Cambiare il **nome installation** Flatpak
+- Cambiare il **mount point** e il **percorso programs**
+- Cambiare il **file di configurazione**
+
+Tutto viene salvato in `~/.config/swichyssd/config.json`.
+
 ## Prerequisiti (una tantum)
 
 Il programma richiede che l'SSD esterno sia configurato come custom installation
@@ -51,12 +61,12 @@ chmod +x install.sh   # solo se da' "Permesso negato"
 ./install.sh
 ```
 
-Poi cerca **"Swichy SSD"** nel menu delle applicazioni (icona disco rimovibile).
+Poi cerca **"Swichy SSD"** nel menu delle applicazioni (icona disco).
 
 ## Requisiti
 
 - Fedora (o altra distro) con GNOME e Flatpak
-- `python3-gobject` (gia' presente su Fedora Workstation)
+- `python3-gobject` e GTK4 (gia' presenti su Fedora Workstation)
 - GNOME Terminal (o kgx) per mostrare il progresso degli spostamenti
 
 ## Regole d'oro con un SSD esterno
