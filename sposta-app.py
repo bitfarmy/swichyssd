@@ -368,6 +368,7 @@ class SwichySSD(Gtk.Window):
 
 def install_app():
     """Copia lo script in ~/.local/bin e crea il lanciatore nel menu."""
+    import json as _json
     bin_dir = os.path.expanduser("~/.local/bin")
     app_dir = os.path.expanduser("~/.local/share/applications")
     os.makedirs(bin_dir, exist_ok=True)
@@ -383,9 +384,9 @@ def install_app():
         "[Desktop Entry]\n"
         "Name=Swichy SSD\n"
         "Comment=Sposta le app Flatpak tra disco interno e SSD esterno\n"
-        f"Exec=python3 {dst}\n"
+        f"Exec=/usr/bin/python3 {dst}\n"
         "Icon=drive-harddisk\n"
-        "Terminal=false\n"
+        "Terminal=true\n"
         "Type=Application\n"
         "Categories=Utility;\n"
     )
