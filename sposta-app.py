@@ -197,6 +197,9 @@ class SwichySSD(Gtk.Window):
         refresh = Gtk.Button(label="Aggiorna")
         refresh.connect("clicked", lambda w: self.aggiorna())
         h.append(refresh)
+        aggiorna_btn = Gtk.Button(label="Aggiorna app Predator")
+        aggiorna_btn.connect("clicked", self.on_aggiorna_predator_clicked)
+        h.append(aggiorna_btn)
         vbox.append(h)
 
         self.lista_predator = Gtk.ListBox()
@@ -278,6 +281,13 @@ class SwichySSD(Gtk.Window):
             self.status.set_markup('<span foreground="red"><b>Predator non collegato.</b></span> Collega il disco e clicca Aggiorna.')
             self.monta_btn.set_visible(False)
 
+    def on_aggiorna_predator_clicked(self, btn):
+        if not os.path.ismount(self.mount_point):
+            self._warning("Predator non montato", "Collega il disco, montalo, poi riprova.")
+            return
+        cmd = f"flatpak update --installation={self.installation} -y"
+        self._terminale("Aggiorna app sul Predator", cmd)
+
     def on_monta_clicked(self, btn):
         img = find_img_path()
         if not img:
@@ -294,7 +304,7 @@ class SwichySSD(Gtk.Window):
         full = f"{cmd}; echo; read -p 'Premi Invio per chiudere...'"
         if term == "gnome-terminal":
             subprocess.Popen([term, "--window", "--title", "Monta Predator", "--", "bash", "-c", full])
-        elif term in ("kgx", "ptyxis"):
+        elif term == "kgx":
             subprocess.Popen([term, "--", "bash", "-c", full])
         else:
             subprocess.Popen([term, "-e", f"bash -c '{full}'"])
