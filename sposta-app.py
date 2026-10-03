@@ -4,6 +4,7 @@
 Swichy SSD - sposta le app Flatpak tra disco interno e SSD esterno.
 Richiede: GTK4 (python3-gobject).
 """
+import json
 import sys
 import traceback
 
@@ -382,7 +383,6 @@ class SwichySSD(Gtk.Window):
 
 def install_app():
     """Copia lo script in ~/.local/bin e crea il lanciatore nel menu."""
-    import json as _json
     bin_dir = os.path.expanduser("~/.local/bin")
     app_dir = os.path.expanduser("~/.local/share/applications")
     os.makedirs(bin_dir, exist_ok=True)
