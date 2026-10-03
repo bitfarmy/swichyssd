@@ -20,7 +20,9 @@ except Exception as e:
     input("Premi Invio per chiudere...")
     sys.exit(1)
 
+import glob
 import os
+import re
 import shutil
 import subprocess
 
@@ -286,7 +288,7 @@ class SwichySSD(Gtk.Window):
             return
         term = find_terminal()
         if not term:
-            self._dialog("Errore", "Nessun terminale trovato. Installa GNOME Terminal o Ptyxis.", error=True)
+            self._dialog("Errore", "Nessun terminale trovato.", error=True)
             return
         cmd = f"sudo mkdir -p {self.mount_point} && sudo mount -o loop '{img}' {self.mount_point}"
         full = f"{cmd}; echo; read -p 'Premi Invio per chiudere...'"
@@ -348,6 +350,30 @@ class SwichySSD(Gtk.Window):
                  "--app", "--columns=application"])
         return set(r.stdout.split()) if r.returncode == 0 else set()
 
+    def _esporta_desktop(self, app_id):
+        """Copia il .desktop dal pacchetto Flatpak al menu utente."""
+        src_pattern = f"{self.programs_path}/app/{app_id}/*/stable/*/export/share/applications/{app_id}.desktop"
+        matches = glob.glob(src_pattern)
+        if not matches:
+            return
+        src = matches[0]
+        dst_dir = os.path.expanduser("~/.local/share/applications/")
+        os.makedirs(dst_dir, exist_ok=True)
+        dst = os.path.join(dst_dir, f"{app_id}.desktop")
+        with open(src) as f:
+            content = f.read()
+        content = re.sub(r'^Exec=.*$', f'Exec=flatpak run --installation={self.installation} {app_id}', content, flags=re.MULTILINE)
+        with open(dst, "w") as f:
+            f.write(content)
+        subprocess.run(["update-desktop-database", dst_dir], capture_output=True)
+
+    def _rimuovi_desktop(self, app_id):
+        """Rimuove il .desktop personalizzato dal menu utente."""
+        path = os.path.expanduser(f"~/.local/share/applications/{app_id}.desktop")
+        if os.path.isfile(path):
+            os.remove(path)
+            subprocess.run(["update-desktop-database", os.path.expanduser("~/.local/share/applications/")], capture_output=True)
+
     def on_settings_clicked(self, btn):
         dlg = SettingsDialog(self)
         dlg.present()
@@ -369,12 +395,14 @@ class SwichySSD(Gtk.Window):
         if not os.path.ismount(self.mount_point):
             self._warning("Predator non montato", "Collega il disco e clicca 'Monta il Predator', poi riprova.")
             return
+        self._esporta_desktop(app_id)
         cmd = (f"flatpak install --installation={self.installation} -y flathub {app_id} && "
                f"(flatpak uninstall --system -y {app_id} 2>/dev/null; "
                f"flatpak uninstall --user -y {app_id} 2>/dev/null)")
         self._terminale(f"Sposto {nome} sul Predator", cmd)
 
     def sposta_su_interno(self, app_id, nome):
+        self._rimuovi_desktop(app_id)
         cmd = (f"flatpak install --user -y flathub {app_id} && "
                f"flatpak uninstall --installation={self.installation} -y {app_id}")
         self._terminale(f"Sposto {nome} sul disco interno", cmd)
