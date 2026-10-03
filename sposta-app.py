@@ -74,7 +74,7 @@ def find_img_path():
 
 
 def find_terminal():
-    for term in ("gnome-terminal", "kgx", "x-terminal-emulator"):
+    for term in ("ptyxis", "gnome-terminal", "kgx", "x-terminal-emulator"):
         if shutil.which(term):
             return term
     return None
@@ -258,6 +258,10 @@ class SwichySSD(Gtk.Window):
         lista.append(r)
 
     def check_prerequisiti(self):
+        problemi = []
+        if not os.path.isfile(self.conf_file):
+            problemi.append("installation non configurata")
+
         loop_montato = os.path.ismount(self.mount_point)
         predator_collegato = find_predator_mount() is not None
         img = find_img_path()
@@ -282,13 +286,13 @@ class SwichySSD(Gtk.Window):
             return
         term = find_terminal()
         if not term:
-            self._dialog("Errore", "Nessun terminale trovato.", error=True)
+            self._dialog("Errore", "Nessun terminale trovato. Installa GNOME Terminal o Ptyxis.", error=True)
             return
         cmd = f"sudo mkdir -p {self.mount_point} && sudo mount -o loop '{img}' {self.mount_point}"
         full = f"{cmd}; echo; read -p 'Premi Invio per chiudere...'"
         if term == "gnome-terminal":
             subprocess.Popen([term, "--window", "--title", "Monta Predator", "--", "bash", "-c", full])
-        elif term == "kgx":
+        elif term in ("kgx", "ptyxis"):
             subprocess.Popen([term, "--", "bash", "-c", full])
         else:
             subprocess.Popen([term, "-e", f"bash -c '{full}'"])
@@ -351,12 +355,12 @@ class SwichySSD(Gtk.Window):
     def _terminale(self, titolo, comando):
         term = find_terminal()
         if not term:
-            self._dialog("Errore", "Nessun terminale trovato (gnome-terminal/kgx).", error=True)
+            self._dialog("Errore", "Nessun terminale trovato. Installa GNOME Terminal o Ptyxis.", error=True)
             return
         full = f"{comando}; echo; read -p 'Premi Invio per chiudere...'"
         if term == "gnome-terminal":
             subprocess.Popen([term, "--window", "--title", titolo, "--", "bash", "-c", full])
-        elif term == "kgx":
+        elif term in ("kgx", "ptyxis"):
             subprocess.Popen([term, "--", "bash", "-c", full])
         else:
             subprocess.Popen([term, "-e", f"bash -c '{full}'"])
