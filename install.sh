@@ -4,19 +4,22 @@ set -e
 
 BIN_DIR="$HOME/.local/bin"
 APP_DIR="$HOME/.local/share/applications"
-DESKTOP="$APP_DIR/swichyssd.desktop"
+
+# Pulizia versioni precedenti
+rm -f "$APP_DIR/sposta-app.desktop"
+rm -f "$APP_DIR/swichyssd.desktop"
 
 mkdir -p "$BIN_DIR" "$APP_DIR"
 cp "$(dirname "$0")/sposta-app.py" "$BIN_DIR/sposta-app.py"
 chmod +x "$BIN_DIR/sposta-app.py"
 
 # genera il .desktop con il percorso corretto di QUESTO utente
-cat > "$DESKTOP" <<EOF
+cat > "$APP_DIR/swichyssd.desktop" <<EOF
 [Desktop Entry]
 Name=Swichy SSD
 Comment=Sposta le app Flatpak tra disco interno e SSD esterno
 Exec=$BIN_DIR/sposta-app.py
-Icon=drive-removable-media
+Icon=drive-harddisk
 Terminal=false
 Type=Application
 Categories=Utility;

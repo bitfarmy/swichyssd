@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Swichy SSD - sposta le app Flatpak tra disco interno e SSD Predator.
-Nessuno store, nessuna ricerca: mostra cio' che hai gia' installato.
+Swichy SSD - sposta le app Flatpak tra disco interno e SSD esterno.
 Richiede: GTK4 (python3-gobject).
 """
 import sys
@@ -24,9 +23,31 @@ import os
 import shutil
 import subprocess
 
-INSTALLATION = "predator"
-MOUNT_POINT = "/mnt/predator-fedora"
-CONF_FILE = "/etc/flatpak/installations.d/predator.conf"
+CONFIG_DIR = os.path.expanduser("~/.config/swichyssd")
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+
+DEFAULT_CONFIG = {
+    "installation_name": "predator",
+    "mount_point": "/mnt/predator-fedora",
+    "programs_path": "/mnt/predator-fedora/programs",
+    "conf_file": "/etc/flatpak/installations.d/predator.conf"
+}
+
+
+def load_config():
+    if os.path.isfile(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE) as f:
+                return {**DEFAULT_CONFIG, **json.load(f)}
+        except Exception:
+            pass
+    return DEFAULT_CONFIG.copy()
+
+
+def save_config(cfg):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(cfg, f, indent=2)
 
 
 def run(cmd):
@@ -40,25 +61,116 @@ def find_terminal():
     return None
 
 
+class SettingsDialog(Gtk.Window):
+    def __init__(self, parent):
+        super().__init__(title="Impostazioni Swichy SSD")
+        self.set_transient_for(parent)
+        self.set_modal(True)
+        self.set_default_size(480, 360)
+        self.parent = parent
+        cfg = parent.config
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        box.set_margin_top(18)
+        box.set_margin_bottom(18)
+        box.set_margin_start(18)
+        box.set_margin_end(18)
+        self.set_child(box)
+
+        # Titolo
+        title = Gtk.Label()
+        title.set_markup("<b>Impostazioni</b>")
+        title.set_xalign(0)
+        box.append(title)
+
+        # Campi
+        self.entry_installation = self._add_field(box, "Nome installation Flatpak:", cfg["installation_name"])
+        self.entry_mount = self._add_field(box, "Mount point SSD:", cfg["mount_point"])
+        self.entry_programs = self._add_field(box, "Percorso programs:", cfg["programs_path"])
+        self.entry_conf = self._add_field(box, "File configurazione:", cfg["conf_file"])
+
+        # Info
+        info = Gtk.Label()
+        info.set_markup("<small>I percorsi devono corrispondere a una custom installation Flatpak valida.\n"
+                        "Dopo aver salvato, l'app aggiorna automaticamente i parametri.</small>")
+        info.set_wrap(True)
+        info.set_xalign(0)
+        box.append(info)
+
+        # Bottoni
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        btn_box.set_halign(Gtk.Align.END)
+        cancel = Gtk.Button(label="Annulla")
+        cancel.connect("clicked", lambda w: self.destroy())
+        save = Gtk.Button(label="Salva")
+        save.get_style_context().add_class("suggested-action")
+        save.connect("clicked", self.on_save)
+        btn_box.append(cancel)
+        btn_box.append(save)
+        box.append(btn_box)
+
+    def _add_field(self, parent, label_text, value):
+        lbl = Gtk.Label(label=label_text)
+        lbl.set_xalign(0)
+        lbl.set_halign(Gtk.Align.START)
+        entry = Gtk.Entry()
+        entry.set_text(value)
+        parent.append(lbl)
+        parent.append(entry)
+        return entry
+
+    def on_save(self, w):
+        new_cfg = {
+            "installation_name": self.entry_installation.get_text().strip(),
+            "mount_point": self.entry_mount.get_text().strip(),
+            "programs_path": self.entry_programs.get_text().strip(),
+            "conf_file": self.entry_conf.get_text().strip(),
+        }
+        save_config(new_cfg)
+        self.parent.apply_config(new_cfg)
+        self.destroy()
+
+
 class SwichySSD(Gtk.Window):
     def __init__(self):
         super().__init__(title="Swichy SSD")
-        self.set_default_size(780, 600)
+        self.set_default_size(800, 640)
+        self.config = load_config()
+        self.apply_config(self.config, refresh=False)
 
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        vbox.set_margin_top(10)
-        vbox.set_margin_bottom(10)
-        vbox.set_margin_start(10)
-        vbox.set_margin_end(10)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        vbox.set_margin_top(14)
+        vbox.set_margin_bottom(14)
+        vbox.set_margin_start(14)
+        vbox.set_margin_end(14)
         self.set_child(vbox)
 
-        # barra di stato
+        # --- Header ---
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        title_lbl = Gtk.Label()
+        title_lbl.set_markup("<span size='large'><b>Swichy SSD</b></span>")
+        title_lbl.set_hexpand(True)
+        title_lbl.set_xalign(0)
+        settings_btn = Gtk.Button(label="Impostazioni")
+        settings_btn.connect("clicked", self.on_settings_clicked)
+        header.append(title_lbl)
+        header.append(settings_btn)
+        vbox.append(header)
+
+        # --- Barra di stato ---
         self.status = Gtk.Label()
         self.status.set_xalign(0)
         self.status.set_halign(Gtk.Align.START)
         vbox.append(self.status)
 
-        # ---- sezione: disco interno ----
+        # --- Percorso attuale ---
+        self.path_lbl = Gtk.Label()
+        self.path_lbl.set_xalign(0)
+        self.path_lbl.set_halign(Gtk.Align.START)
+        self._update_path_label()
+        vbox.append(self.path_lbl)
+
+        # --- sezione: disco interno ---
         vbox.append(self._title("Sul disco interno (dove le installa lo store)"))
         self.lista_interno = Gtk.ListBox()
         self.lista_interno.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -68,7 +180,7 @@ class SwichySSD(Gtk.Window):
         sw1.set_child(self.lista_interno)
         vbox.append(sw1)
 
-        # ---- sezione: predator ----
+        # --- sezione: predator ---
         h = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         h.append(self._title("Sul Predator (richiede il disco collegato)"))
         refresh = Gtk.Button(label="Aggiorna")
@@ -86,6 +198,23 @@ class SwichySSD(Gtk.Window):
 
         self.check_prerequisiti()
         self.aggiorna()
+
+    def apply_config(self, cfg, refresh=True):
+        self.config = cfg
+        self.installation = cfg["installation_name"]
+        self.mount_point = cfg["mount_point"]
+        self.programs_path = cfg["programs_path"]
+        self.conf_file = cfg["conf_file"]
+        if refresh:
+            self._update_path_label()
+            self.check_prerequisiti()
+            self.aggiorna()
+
+    def _update_path_label(self):
+        txt = (f"<small><b>Percorso attuale:</b> {self.programs_path}\n"
+               f"<b>Installation:</b> {self.installation}  |  "
+               f"<b>Config:</b> {self.conf_file}</small>")
+        self.path_lbl.set_markup(txt)
 
     def _title(self, t):
         l = Gtk.Label()
@@ -128,19 +257,17 @@ class SwichySSD(Gtk.Window):
 
     def check_prerequisiti(self):
         problemi = []
-        if not os.path.isfile(CONF_FILE):
-            problemi.append("installation 'predator' non configurata")
-        if not os.path.ismount(MOUNT_POINT):
-            problemi.append("Predator non collegato/montato")
+        if not os.path.isfile(self.conf_file):
+            problemi.append("installation non configurata (manca il file .conf)")
+        if not os.path.ismount(self.mount_point):
+            problemi.append("SSD non collegato/montato")
         if problemi:
             self.status.set_markup('<span foreground="red"><b>ATTENZIONE:</b> '
                                    + "; ".join(problemi) + "</span>")
         else:
             self.status.set_markup('<span foreground="green"><b>Tutto ok.</b></span> '
-                                   "Le tue app e i tuoi dati restano al loro posto: lo spostamento "
-                                   "non tocca le impostazioni delle app.")
+                                   "Le tue app e i tuoi dati restano intatti.")
 
-    # ---------------- elenchi ----------------
     def pulisci(self, lista):
         while True:
             r = lista.get_first_child()
@@ -173,10 +300,10 @@ class SwichySSD(Gtk.Window):
                     self.sposta_su_predator, "suggested-action"))
 
         # app sul predator
-        r = run(["flatpak", "list", f"--installation={INSTALLATION}",
+        r = run(["flatpak", "list", f"--installation={self.installation}",
                  "--app", "--columns=application,name"])
         trovate = []
-        if r.returncode == 0 and os.path.ismount(MOUNT_POINT):
+        if r.returncode == 0 and os.path.ismount(self.mount_point):
             for line in r.stdout.splitlines():
                 p = line.split("\t")
                 if len(p) >= 2:
@@ -190,11 +317,14 @@ class SwichySSD(Gtk.Window):
                     self.sposta_su_interno))
 
     def _id_predator(self):
-        r = run(["flatpak", "list", f"--installation={INSTALLATION}",
+        r = run(["flatpak", "list", f"--installation={self.installation}",
                  "--app", "--columns=application"])
         return set(r.stdout.split()) if r.returncode == 0 else set()
 
-    # ---------------- azioni ----------------
+    def on_settings_clicked(self, btn):
+        dlg = SettingsDialog(self)
+        dlg.present()
+
     def _terminale(self, titolo, comando):
         term = find_terminal()
         if not term:
@@ -209,20 +339,19 @@ class SwichySSD(Gtk.Window):
             subprocess.Popen([term, "-e", f"bash -c '{full}'"])
 
     def sposta_su_predator(self, app_id, nome):
-        if not os.path.ismount(MOUNT_POINT):
+        if not os.path.ismount(self.mount_point):
             self._warning("Predator non collegato", "Collega e monta il disco, poi riprova.")
             return
-        cmd = (f"flatpak install --installation={INSTALLATION} -y flathub {app_id} && "
+        cmd = (f"flatpak install --installation={self.installation} -y flathub {app_id} && "
                f"(flatpak uninstall --system -y {app_id} 2>/dev/null; "
                f"flatpak uninstall --user -y {app_id} 2>/dev/null)")
         self._terminale(f"Sposto {nome} sul Predator", cmd)
 
     def sposta_su_interno(self, app_id, nome):
         cmd = (f"flatpak install --user -y flathub {app_id} && "
-               f"flatpak uninstall --installation={INSTALLATION} -y {app_id}")
+               f"flatpak uninstall --installation={self.installation} -y {app_id}")
         self._terminale(f"Sposto {nome} sul disco interno", cmd)
 
-    # ---------------- dialog ----------------
     def _dialog(self, title, message, error=False):
         dlg = Gtk.MessageDialog(
             transient_for=self,
