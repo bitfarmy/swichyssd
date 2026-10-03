@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sposta App - sposta le app Flatpak tra disco interno e SSD Predator.
+Swichy SSD - sposta le app Flatpak tra disco interno e SSD Predator.
 Nessuno store, nessuna ricerca: mostra cio' che hai gia' installato.
 """
-import gi
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk
+import sys
+import traceback
+
+try:
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk
+except Exception as e:
+    print("ERRORE: manca python3-gobject oppure non sei su GNOME.")
+    print(e)
+    traceback.print_exc()
+    input("Premi Invio per chiudere...")
+    sys.exit(1)
 
 import os
 import shutil
@@ -28,9 +38,9 @@ def find_terminal():
     return None
 
 
-class SpostaApp(Gtk.Window):
+class SwichySSD(Gtk.Window):
     def __init__(self):
-        super().__init__(title="Sposta App - Disco interno <-> Predator")
+        super().__init__(title="Swichy SSD - Disco interno <-> Predator")
         self.set_default_size(780, 600)
         self.set_border_width(10)
 
@@ -202,6 +212,10 @@ class SpostaApp(Gtk.Window):
 
 
 if __name__ == "__main__":
-    win = SpostaApp()
-    win.connect("destroy", Gtk.main_quit)
-    Gtk.main()
+    try:
+        win = SwichySSD()
+        win.connect("destroy", Gtk.main_quit)
+        Gtk.main()
+    except Exception:
+        traceback.print_exc()
+        input("Errore all'avvio (vedi sopra). Premi Invio per chiudere...")
