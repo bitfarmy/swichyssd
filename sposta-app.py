@@ -82,6 +82,11 @@ def find_terminal():
     return None
 
 
+def build_full_command(cmd):
+    """Costruisce il comando con pausa finale compatibile con tutti i terminali."""
+    return f"{cmd}; echo; echo 'Premi Invio per chiudere...'; read dummy"
+
+
 class SettingsDialog(Gtk.Window):
     def __init__(self, parent):
         super().__init__(title="Impostazioni Swichy SSD")
@@ -301,13 +306,16 @@ class SwichySSD(Gtk.Window):
             self._dialog("Errore", "Nessun terminale trovato.", error=True)
             return
         cmd = f"sudo mkdir -p {self.mount_point} && sudo mount -o loop '{img}' {self.mount_point}"
-        full = f"{cmd}; echo; read -p 'Premi Invio per chiudere...'"
+        full = build_full_command(cmd)
+        # CORREZIONE: ogni terminale riceve argomenti separati, non una stringa unica.
+        # Il vecchio ramo "else" passava 'bash -c ...' come singolo eseguibile,
+        # causando "Failed to find executable bash -c '...'".
         if term == "gnome-terminal":
             subprocess.Popen([term, "--window", "--title", "Monta Predator", "--", "bash", "-c", full])
-        elif term == "kgx":
+        elif term in ("kgx", "ptyxis"):
             subprocess.Popen([term, "--", "bash", "-c", full])
         else:
-            subprocess.Popen([term, "-e", f"bash -c '{full}'"])
+            subprocess.Popen([term, "-e", "bash", "-c", full])
 
     def pulisci(self, lista):
         while True:
@@ -393,13 +401,14 @@ class SwichySSD(Gtk.Window):
         if not term:
             self._dialog("Errore", "Nessun terminale trovato. Installa GNOME Terminal o Ptyxis.", error=True)
             return
-        full = f"{comando}; echo; read -p 'Premi Invio per chiudere...'"
+        full = build_full_command(comando)
+        # CORREZIONE: stesso fix del ramo on_monta_clicked.
         if term == "gnome-terminal":
             subprocess.Popen([term, "--window", "--title", titolo, "--", "bash", "-c", full])
         elif term in ("kgx", "ptyxis"):
             subprocess.Popen([term, "--", "bash", "-c", full])
         else:
-            subprocess.Popen([term, "-e", f"bash -c '{full}'"])
+            subprocess.Popen([term, "-e", "bash", "-c", full])
 
     def sposta_su_predator(self, app_id, nome):
         if not os.path.ismount(self.mount_point):
