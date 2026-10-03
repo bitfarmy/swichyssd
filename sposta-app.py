@@ -380,6 +380,38 @@ class SwichySSD(Gtk.Window):
         dlg.present()
 
 
+def install_app():
+    """Copia lo script in ~/.local/bin e crea il lanciatore nel menu."""
+    import json as _json
+    bin_dir = os.path.expanduser("~/.local/bin")
+    app_dir = os.path.expanduser("~/.local/share/applications")
+    os.makedirs(bin_dir, exist_ok=True)
+    os.makedirs(app_dir, exist_ok=True)
+
+    # copia se stesso
+    src = os.path.abspath(__file__)
+    dst = os.path.join(bin_dir, "sposta-app.py")
+    shutil.copy2(src, dst)
+
+    # crea il .desktop
+    desktop = (
+        "[Desktop Entry]\n"
+        "Name=Swichy SSD\n"
+        "Comment=Sposta le app Flatpak tra disco interno e SSD esterno\n"
+        f"Exec=python3 {dst}\n"
+        "Icon=drive-harddisk\n"
+        "Terminal=false\n"
+        "Type=Application\n"
+        "Categories=Utility;\n"
+    )
+    with open(os.path.join(app_dir, "swichyssd.desktop"), "w") as f:
+        f.write(desktop)
+
+    subprocess.run(["update-desktop-database", app_dir], capture_output=True)
+    print("Installato! Cerca 'Swichy SSD' nel menu delle applicazioni.")
+    print(f"File copiato in: {dst}")
+
+
 def on_activate(app):
     win = SwichySSD()
     win.set_application(app)
@@ -387,6 +419,10 @@ def on_activate(app):
 
 
 if __name__ == "__main__":
+    if "--install" in sys.argv:
+        install_app()
+        sys.exit(0)
+
     try:
         app = Gtk.Application(application_id="com.bitfarmy.swichyssd")
         app.connect("activate", on_activate)
