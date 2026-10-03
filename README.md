@@ -6,7 +6,7 @@ con una custom installation di Flatpak (in italiano: niente complicazioni, solo 
 ## Come funziona
 
 1. Installi le app normalmente da GNOME Software (finiscono sul disco interno)
-2. Apri **Sposta App**: elenca tutte le tue app
+2. Apri **Swichy SSD**: elenca tutte le tue app
 3. Un click su **"Sposta su Predator"** → l'app viene reinstallata sull'SSD esterno
    e rimossa dal disco interno. Dati e impostazioni delle app restano intatti
    (vivono in `~/.var/app/`, non vengono toccati).
@@ -47,16 +47,17 @@ sudo flatpak remote-add --installation=predator --if-not-exists flathub https://
 ```bash
 git clone https://github.com/bitfarmy/swichyssd.git
 cd swichyssd
+chmod +x install.sh   # solo se da' "Permesso negato"
 ./install.sh
 ```
 
-Poi cerca "Sposta App" nel menu delle applicazioni.
+Poi cerca **"Swichy SSD"** nel menu delle applicazioni (icona disco rimovibile).
 
 ## Requisiti
 
 - Fedora (o altra distro) con GNOME e Flatpak
 - `python3-gobject` (gia' presente su Fedora Workstation)
-- GNOME Terminal (o kgx) per mostrare il progresso
+- GNOME Terminal (o kgx) per mostrare il progresso degli spostamenti
 
 ## Regole d'oro con un SSD esterno
 
