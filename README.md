@@ -57,11 +57,18 @@ sudo flatpak remote-add --installation=predator --if-not-exists flathub https://
 ```bash
 git clone https://github.com/bitfarmy/swichyssd.git
 cd swichyssd
-chmod +x install.sh   # solo se da' "Permesso negato"
-./install.sh
+python3 sposta-app.py --install
 ```
 
 Poi cerca **"Swichy SSD"** nel menu delle applicazioni (icona disco).
+
+Per aggiornare (stessi comandi, sovrascrive automaticamente):
+
+```bash
+cd swichyssd
+git pull
+python3 sposta-app.py --install
+```
 
 ## Requisiti
 
