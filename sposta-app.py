@@ -30,7 +30,8 @@ DEFAULT_CONFIG = {
     "installation_name": "predator",
     "mount_point": "/mnt/predator-fedora",
     "programs_path": "/mnt/predator-fedora/programs",
-    "conf_file": "/etc/flatpak/installations.d/predator.conf"
+    "conf_file": "/etc/flatpak/installations.d/predator.conf",
+    "img_path": "/mnt/predator-ssd/asus-linux/fedora-apps.img"
 }
 
 
@@ -88,6 +89,7 @@ class SettingsDialog(Gtk.Window):
         self.entry_mount = self._add_field(box, "Mount point SSD:", cfg["mount_point"])
         self.entry_programs = self._add_field(box, "Percorso programs:", cfg["programs_path"])
         self.entry_conf = self._add_field(box, "File configurazione:", cfg["conf_file"])
+        self.entry_img = self._add_field(box, "File immagine (sul disco esterno):", cfg.get("img_path", ""))
 
         # Info
         info = Gtk.Label()
@@ -125,6 +127,7 @@ class SettingsDialog(Gtk.Window):
             "mount_point": self.entry_mount.get_text().strip(),
             "programs_path": self.entry_programs.get_text().strip(),
             "conf_file": self.entry_conf.get_text().strip(),
+            "img_path": self.entry_img.get_text().strip(),
         }
         save_config(new_cfg)
         self.parent.apply_config(new_cfg)
@@ -205,15 +208,17 @@ class SwichySSD(Gtk.Window):
         self.mount_point = cfg["mount_point"]
         self.programs_path = cfg["programs_path"]
         self.conf_file = cfg["conf_file"]
+        self.img_path = cfg.get("img_path", "")
         if refresh:
             self._update_path_label()
             self.check_prerequisiti()
             self.aggiorna()
 
     def _update_path_label(self):
-        txt = (f"<small><b>Percorso attuale:</b> {self.programs_path}\n"
-               f"<b>Installation:</b> {self.installation}  |  "
-               f"<b>Config:</b> {self.conf_file}</small>")
+        img = self.img_path or "Non impostato"
+        txt = (f"<small><b>File immagine (disco esterno):</b> {img}\n"
+               f"<b>Percorso montato:</b> {self.programs_path}  |  "
+               f"<b>Installation:</b> {self.installation}</small>")
         self.path_lbl.set_markup(txt)
 
     def _title(self, t):
