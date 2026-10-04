@@ -1,18 +1,26 @@
 # SwichySSD
 
-Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora Linux.
-Niente fstab pericoloso, niente blocchi all'avvio: solo un bottone per montare il disco quando serve.
+Versione 2.0. Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora Linux.
+Niente fstab pericoloso, niente blocchi all'avvio: il disco si monta e si smonta dai bottoni.
+
+## Versione 2.0
+
+- **Smonta immagine** chiude solo il file `.img` delle app. I documenti sulla partizione exFAT restano aperti.
+- **Espelli disco** smonta prima l'immagine, poi l'exFAT, e spegne il disco. Usalo prima di staccare il cavo.
+- **Aggiorna** rilegge se il disco è collegato e se l'immagine è montata, e aggiorna i bottoni.
+- Lo spostamento copia l'app già installata, dal remote da cui proviene, senza riscaricarla da Flathub. La voce di menu e le icone si creano solo se la copia riesce. Se la disinstallazione fallisce, l'errore resta nel terminale e l'app non viene nascosta.
 
 ## Come funziona
 
 1. Installi le app normalmente da GNOME Software (finiscono sul disco interno)
 2. Collega il tuo SSD esterno
-3. Apri **Swichy SSD**: se il disco non e' ancora montato, clicca **"Monta il Predator"**
-4. Un click su **"Sposta su Predator"** → l'app viene reinstallata sull'SSD esterno
-   e rimossa dal disco interno
+3. Apri **Swichy SSD**: se il disco non è ancora montato, clicca **"Monta il Predator"**
+4. Un click su **"Sposta su Predator"** copia l'app sull'SSD e la toglie dal disco interno
+5. Per chiudere solo le app e tenere i file: **Smonta immagine**
+6. Per staccare il disco: **Espelli disco**, poi clicca **Aggiorna**
 
 Viceversa, le app sull'SSD hanno il bottone **"<- Sposta sul disco interno"**
-per quando devi usare il PC senza il disco.
+per quando devi usare il PC senza il disco. Lo spostamento chiede la password di amministrazione perché il repository Flatpak sul Predator è di root.
 
 **I tuoi dati e impostazioni delle app restano sempre intatti:** vivono in `~/.var/app/`
 e non vengono toccati quando sposti un'app.
@@ -85,8 +93,8 @@ python3 sposta-app.py --install
 | Situazione | Cosa succede |
 |---|---|
 | **PC senza SSD collegato** | Fedora avvia normalmente. Lo store installa sul disco interno. Swichy SSD mostra "Predator non collegato". |
-| **SSD collegato, non montato** | Swichy SSD rileva il disco e mostra il bottone **"Monta il Predator"**. Cliccando, apre un terminale con il comando `sudo mount` gia' pronto. |
-| **SSD montato** | Vedi le app sul Predator e puoi spostarle avanti e indietro. |
+| **SSD collegato, non montato** | Swichy SSD rileva il disco e mostra **"Monta il Predator"**. Il bottone **Aggiorna** rilegge anche questo stato. |
+| **SSD montato** | Vedi le app sul Predator e puoi spostarle avanti e indietro. **Smonta immagine** chiude solo il file `.img`. **Espelli disco** smonta prima l'immagine, poi la partizione exFAT, e spegne il disco. |
 
 **Niente fstab, niente blocchi all'avvio.** Il montaggio e' manuale o tramite bottone.
 
@@ -124,11 +132,11 @@ Windows legge queste cartelle normalmente.
 
 - Fedora (o altra distro) con GNOME e Flatpak
 - `python3-gobject` e GTK4 (gia' presenti su Fedora Workstation)
-- GNOME Terminal (o kgx) per mostrare il progresso degli spostamenti
+- Ptyxis, GNOME Terminal o kgx, per mostrare il progresso degli spostamenti e chiedere la password
 
 ## Regole d'oro con un SSD esterno
 
-- **Espelli sempre il disco in sicurezza** prima di scollegarlo
+- **Espelli sempre il disco** con il bottone **Espelli disco** prima di scollegarlo. Staccare il cavo con l'immagine ancora montata lascia l'exFAT sporco.
 - Se Windows propone di formattare il disco o il file `.img`, annulla sempre
 - Senza disco collegato, le app sull'SSD non sono disponibili (e il programma te lo segnala)
 - Se reinstalli Fedora, il file `.img` e le app dentro restano intatti sul SSD
