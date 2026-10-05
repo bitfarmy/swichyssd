@@ -1,9 +1,9 @@
 # SwichySSD
 
-Versione 2.0. Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora Linux.
+Versione 0.3.0. Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora Linux.
 Niente fstab pericoloso, niente blocchi all'avvio: il disco si monta e si smonta dai bottoni.
 
-## Versione 2.0
+## Cosa fa
 
 - **Smonta immagine** chiude solo il file `.img` delle app. I documenti sulla partizione exFAT restano aperti.
 - **Espelli disco** smonta prima l'immagine, poi l'exFAT, e spegne il disco. Usalo prima di staccare il cavo.
@@ -70,22 +70,24 @@ CONF
 sudo flatpak remote-add --installation=predator --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 ```
 
-## Installazione Swichy SSD
+## Installazione
+
+GTK non arriva da pip. Su Fedora:
 
 ```bash
-git clone https://github.com/bitfarmy/swichyssd.git
-cd swichyssd
-python3 sposta-app.py --install
+sudo dnf install python3-gobject gtk4
+pipx install swichyssd
+swichyssd --install
 ```
 
 Poi cerca **"Swichy SSD"** nel menu delle applicazioni (icona disco).
 
-Per aggiornare (stessi comandi, sovrascrive automaticamente):
+Da un clone, gli stessi file:
 
 ```bash
+git clone https://github.com/bitfarmy/swichyssd.git
 cd swichyssd
-git pull
-python3 sposta-app.py --install
+python3 swichyssd.py --install
 ```
 
 ## Come si comporta il sistema

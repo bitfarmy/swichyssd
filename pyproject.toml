@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swichyssd"
+version = "0.3.0"
+description = "Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "bitfarmy" }]
+keywords = ["flatpak", "fedora", "gtk", "ssd"]
+classifiers = [
+    "Environment :: X11 Applications :: GTK",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Desktop Environment",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/bitfarmy/swichyssd"
+Repository = "https://github.com/bitfarmy/swichyssd"
+Issues = "https://github.com/bitfarmy/swichyssd/issues"
+
+[project.scripts]
+swichyssd = "swichyssd:main"
+
+[tool.setuptools]
+py-modules = ["swichyssd"]

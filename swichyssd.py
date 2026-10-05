@@ -739,20 +739,21 @@ class SwichySSD(Gtk.Window):
 
 
 def install_app():
-    bin_dir = os.path.expanduser("~/.local/bin")
     app_dir = os.path.expanduser("~/.local/share/applications")
-    os.makedirs(bin_dir, exist_ok=True)
     os.makedirs(app_dir, exist_ok=True)
-
-    src = os.path.abspath(__file__)
-    dst = os.path.join(bin_dir, "sposta-app.py")
-    shutil.copy2(src, dst)
+    command = shutil.which("swichyssd")
+    if command is None:
+        bin_dir = os.path.expanduser("~/.local/bin")
+        os.makedirs(bin_dir, exist_ok=True)
+        command = os.path.join(bin_dir, "swichyssd")
+        shutil.copy2(os.path.abspath(__file__), command)
+        os.chmod(command, 0o755)
 
     desktop = (
         "[Desktop Entry]\n"
         "Name=Swichy SSD\n"
         "Comment=Sposta le app Flatpak tra disco interno e SSD esterno\n"
-        f"Exec=/usr/bin/python3 {dst}\n"
+        f"Exec={command}\n"
         "Icon=drive-harddisk\n"
         "Terminal=false\n"
         "Type=Application\n"
@@ -763,7 +764,7 @@ def install_app():
 
     subprocess.run(["update-desktop-database", app_dir], capture_output=True)
     print("Installato! Cerca 'Swichy SSD' nel menu delle applicazioni.")
-    print(f"File copiato in: {dst}")
+    print(f"Comando: {command}")
 
 
 def on_activate(app):
@@ -772,17 +773,17 @@ def on_activate(app):
     win.present()
 
 
-if __name__ == "__main__":
+def main():
     if "--install" in sys.argv:
         install_app()
-        sys.exit(0)
+        return
     for flag, direction in (("--move-to-predator", "to-predator"), ("--move-to-internal", "to-internal")):
         if flag in sys.argv:
             index = sys.argv.index(flag)
             if index + 1 >= len(sys.argv):
                 sys.exit("Manca l'id dell'app.")
             move_app(direction, sys.argv[index + 1])
-            sys.exit(0)
+            return
 
     try:
         app = Gtk.Application(application_id="com.bitfarmy.swichyssd")
@@ -791,3 +792,7 @@ if __name__ == "__main__":
     except Exception:
         traceback.print_exc()
         input("Errore all'avvio (vedi sopra). Premi Invio per chiudere...")
+
+
+if __name__ == "__main__":
+    main()
