@@ -122,8 +122,8 @@ Per i tuoi documenti, codice, repository: usa la partizione **exFAT** del Predat
 direttamente, ad esempio:
 
 ```
-/run/media/bitfarmy/PSSD GP30/progetti
-/run/media/bitfarmy/PSSD GP30/repository
+/run/media/$USER/NOME_SSD/progetti
+/run/media/$USER/NOME_SSD/repository
 ```
 
 Windows legge queste cartelle normalmente.
