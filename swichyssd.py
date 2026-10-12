@@ -26,6 +26,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 
 CONFIG_DIR = os.path.expanduser("~/.config/swichyssd")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
@@ -359,6 +360,120 @@ def build_full_command(cmd):
     return f"{cmd}; echo; echo 'Premi Invio per chiudere...'; read dummy"
 
 
+def processi_sul_mount(mount):
+    """Programmi che tengono il mount occupato, con un file aperto o in memoria."""
+    nomi = {
+        "gnome-shell": "GNOME",
+        "gnome-software": "GNOME Software",
+        "firefox": "Firefox",
+        "nautilus": "File",
+        "ptyxis": "Terminale",
+        "mutter-x11-fram": "GNOME",
+        "python3": "Swichy SSD",
+        "xdg-desktop-por": "Portale GNOME",
+    }
+    trovati = []
+    if not mount:
+        return trovati
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        base = os.path.join("/proc", pid)
+        occupato = False
+        try:
+            with open(os.path.join(base, "maps")) as handle:
+                occupato = mount in handle.read()
+        except OSError:
+            pass
+        if not occupato:
+            # Il percorso sotto /mnt resta anche a immagine smontata, sul disco interno.
+            # Conta solo un file che sta davvero sull'immagine, non quella cartella vuota.
+            disco_interno = os.stat("/").st_dev
+            fd_dir = os.path.join(base, "fd")
+            try:
+                for fd in os.listdir(fd_dir):
+                    percorso = os.path.join(fd_dir, fd)
+                    try:
+                        if mount not in os.readlink(percorso):
+                            continue
+                        if os.stat(percorso).st_dev != disco_interno:
+                            occupato = True
+                            break
+                    except OSError:
+                        continue
+            except OSError:
+                pass
+        if not occupato:
+            try:
+                with open(os.path.join(base, "maps")) as handle:
+                    occupato = "/programs/exports/share/icons/" in handle.read()
+            except OSError:
+                pass
+        if not occupato:
+            continue
+        try:
+            with open(os.path.join(base, "comm")) as handle:
+                comm = handle.read().strip()
+        except OSError:
+            continue
+        bello = nomi.get(comm, comm)
+        if bello not in trovati:
+            trovati.append(bello)
+    return trovati
+
+
+def frase_elenco(nomi):
+    if not nomi:
+        return "alcuni programmi"
+    if len(nomi) == 1:
+        return nomi[0]
+    return ", ".join(nomi[:-1]) + " e " + nomi[-1]
+
+
+def percorsi_icone(mount_point):
+    mirror = os.path.expanduser("~/.local/share/swichyssd/icons")
+    icons = os.path.join(mount_point, "programs", "exports", "share", "icons")
+    return mirror, icons
+
+
+def script_prepara_icone(mount_point, come_root=False):
+    """Le icone Flatpak restano sul disco interno.
+
+    Se stanno sull'immagine, i programmi le tengono in memoria e la
+    partizione non si può più espellere.
+    """
+    mirror, icons = percorsi_icone(mount_point)
+    mirror_q = shlex.quote(mirror)
+    icons_q = shlex.quote(icons)
+    sudo = "" if come_root else "sudo "
+    return f"""
+{sudo}/usr/bin/mkdir -p {mirror_q} {icons_q}
+if ! /usr/bin/mountpoint -q {icons_q}; then
+  if [ -z "$(/usr/bin/ls -A {mirror_q} 2>/dev/null)" ]; then
+    {sudo}/usr/bin/cp -a {icons_q}/. {mirror_q}/ 2>/dev/null || true
+  fi
+  {sudo}/usr/bin/mount --bind {mirror_q} {icons_q}
+fi
+"""
+
+
+def script_stacca_icone(mount_point, come_root=False):
+    mirror, icons = percorsi_icone(mount_point)
+    mirror_q = shlex.quote(mirror)
+    icons_q = shlex.quote(icons)
+    sudo = "" if come_root else "sudo "
+    return f"""
+if /usr/bin/mountpoint -q {icons_q}; then
+  stage=$(/usr/bin/mktemp -d)
+  {sudo}/usr/bin/cp -a {mirror_q}/. "$stage"/ 2>/dev/null || true
+  {sudo}/usr/bin/umount {icons_q}
+  {sudo}/usr/bin/mkdir -p {icons_q}
+  {sudo}/usr/bin/cp -a "$stage"/. {icons_q}/ 2>/dev/null || true
+  /usr/bin/rm -rf "$stage"
+fi
+"""
+
+
 class SettingsDialog(Gtk.Window):
     def __init__(self, parent):
         super().__init__(title="Impostazioni Swichy SSD")
@@ -598,35 +713,203 @@ class SwichySSD(Gtk.Window):
             return
         mount = shlex.quote(self.mount_point)
         image = shlex.quote(img)
-        cmd = f"sudo mkdir -p {mount} && sudo mount -o loop {image} {mount}"
+        # Se lo smontaggio precedente è stato rinviato, il file è ancora
+        # agganciato a un loop. Riusarlo evita un secondo mount della stessa ext4.
+        cmd = (
+            f"sudo mkdir -p {mount} && "
+            f"loop=$(losetup -j {image} -n -O NAME | head -n1 || true); "
+            f"if [ -n \"$loop\" ]; then sudo mount \"$loop\" {mount}; "
+            f"else sudo mount -o loop {image} {mount}; fi && "
+            f"if mountpoint -q {mount}; then {script_prepara_icone(self.mount_point)} fi"
+        )
         self._terminale("Monta Predator", cmd)
+
+    def _blocca_disco(self, messaggio):
+        self.monta_btn.set_sensitive(False)
+        self.smonta_btn.set_sensitive(False)
+        self.espelli_btn.set_sensitive(False)
+        self.status.set_markup(messaggio)
+
+    def _esegui_come_root(self, script, fatto):
+        def lavoro():
+            try:
+                risultato = subprocess.run(
+                    ["pkexec", "/usr/bin/bash", "-c", script],
+                    capture_output=True,
+                    text=True,
+                    stdin=subprocess.DEVNULL,
+                )
+                codice, out, err = risultato.returncode, risultato.stdout, risultato.stderr
+            except Exception as exc:
+                codice, out, err = 127, "", str(exc)
+
+            def avvisa():
+                try:
+                    fatto(codice, out, err)
+                except Exception:
+                    traceback.print_exc()
+                    try:
+                        self._fine_operazione_disco(
+                            "Errore",
+                            "L'operazione non è andata a buon fine. Chiudi e riapri Swichy SSD, poi riprova.",
+                            avviso=True,
+                        )
+                    except Exception:
+                        traceback.print_exc()
+                return False
+
+            GLib.idle_add(avvisa)
+
+        threading.Thread(target=lavoro, daemon=True).start()
+
+    def _fine_operazione_disco(self, titolo, messaggio, avviso=False):
+        self.monta_btn.set_sensitive(True)
+        self.smonta_btn.set_sensitive(True)
+        self.espelli_btn.set_sensitive(True)
+        self.aggiorna()
+        if avviso:
+            self._warning(titolo, messaggio)
+        else:
+            self._dialog(titolo, messaggio)
+        return False
 
     def on_smonta_clicked(self, btn):
         if not os.path.ismount(self.mount_point):
             self._warning("Già smontato", "L'immagine non è montata.")
             return
+        chi = frase_elenco(processi_sul_mount(self.mount_point))
+        self._blocca_disco("<b>Smontaggio in corso…</b> Conferma la password.")
         mount = shlex.quote(self.mount_point)
-        cmd = (
-            f"sync && sudo umount {mount} && "
-            "echo \"Immagine smontata. I file sulla partizione exFAT restano aperti. "
-            "Per staccare il disco usa Espelli, poi clicca Aggiorna.\""
+        # Niente umount -l: stacca il mount ma lascia il file immagine aperto,
+        # e a quel punto la partizione non si può più espellere.
+        script = f"""
+set -u
+if ! /usr/bin/mountpoint -q {mount}; then
+  echo GIA
+  exit 0
+fi
+sync
+{script_stacca_icone(self.mount_point, come_root=True)}
+if err=$(/usr/bin/umount {mount} 2>&1); then
+  echo NORMALE
+  exit 0
+fi
+echo OCCUPATO
+printf '%s\\n' "$err"
+exit 0
+"""
+        self._esegui_come_root(script, lambda codice, out, err: self._smonta_fatto(codice, out, err, chi))
+
+    def _smonta_fatto(self, codice, out, err, chi):
+        if codice == 126:
+            return self._fine_operazione_disco("Annullato", "Smontaggio annullato.", avviso=True)
+        if codice == 127:
+            return self._fine_operazione_disco(
+                "Smontaggio non riuscito",
+                err.strip() or "Autorizzazione negata, oppure pkexec non è disponibile.",
+                avviso=True,
+            )
+        stato = out.splitlines()[0].strip() if out.strip() else ""
+        if stato == "NORMALE":
+            return self._fine_operazione_disco(
+                "Immagine smontata",
+                "I file sulla partizione exFAT restano aperti. Per staccare il cavo usa Espelli.",
+            )
+        if stato == "GIA":
+            return self._fine_operazione_disco("Già smontato", "L'immagine non è montata.", avviso=True)
+        if stato == "OCCUPATO":
+            return self._fine_operazione_disco(
+                "Immagine occupata",
+                f"{chi} ha già aperto un file sull'immagine. "
+                "Quel file non si può staccare finché il programma è aperto.\n\n"
+                "Chiudilo e premi di nuovo Smonta. "
+                "Dal prossimo montaggio le icone stanno sul disco interno, "
+                "e non servirà chiudere niente.",
+                avviso=True,
+            )
+        return self._fine_operazione_disco(
+            "Smontaggio non riuscito",
+            err.strip() or "umount non è riuscito.",
+            avviso=True,
         )
-        self._terminale("Smonta immagine", cmd)
 
     def on_espelli_clicked(self, btn):
+        chi = frase_elenco(processi_sul_mount(self.mount_point))
+        self._blocca_disco("<b>Espulsione in corso…</b> Conferma la password.")
         mount = shlex.quote(self.mount_point)
         uuid = shlex.quote(PREDATOR_UUID)
-        cmd = (
-            "set -eu\n"
-            f"if mountpoint -q {mount}; then sync; sudo umount {mount}; fi\n"
-            f"part=$(findmnt -n -o SOURCE -S UUID={uuid} || true)\n"
-            'if [ -z "$part" ]; then echo "Il disco non risulta montato."; exit 0; fi\n'
-            'udisksctl unmount -b "$part"\n'
-            'disk=$(lsblk -no PKNAME "$part")\n'
-            'if [ -n "$disk" ]; then udisksctl power-off -b "/dev/$disk"; fi\n'
-            'echo "Disco espulso. Puoi staccarlo. Torna su Swichy SSD e clicca Aggiorna."\n'
+        script = f"""
+set -u
+if /usr/bin/mountpoint -q {mount}; then
+  sync
+  {script_stacca_icone(self.mount_point, come_root=True)}
+  if ! err=$(/usr/bin/umount {mount} 2>&1); then
+    echo OCCUPATO
+    printf '%s\\n' "$err"
+    exit 0
+  fi
+fi
+part=$(/usr/bin/findmnt -n -o SOURCE -S UUID={uuid} || true)
+if [ -z "$part" ]; then
+  echo GIA
+  exit 0
+fi
+if ! err=$(/usr/bin/udisksctl unmount -b "$part" 2>&1); then
+  echo EXFAT
+  printf '%s\\n' "$err"
+  exit 0
+fi
+disk=$(/usr/bin/lsblk -no PKNAME "$part" || true)
+if [ -n "$disk" ]; then
+  /usr/bin/udisksctl power-off -b "/dev/$disk"
+fi
+echo ESPULSO
+"""
+        self._esegui_come_root(script, lambda codice, out, err: self._espelli_fatto(codice, out, err, chi))
+
+    def _espelli_fatto(self, codice, out, err, chi):
+        if codice == 126:
+            return self._fine_operazione_disco("Annullato", "Espulsione annullata.", avviso=True)
+        if codice == 127:
+            return self._fine_operazione_disco(
+                "Espulsione non riuscita",
+                err.strip() or "Autorizzazione negata, oppure pkexec non è disponibile.",
+                avviso=True,
+            )
+        stato = out.splitlines()[0].strip() if out.strip() else ""
+        resto = "\n".join(out.splitlines()[1:]).strip()
+        if stato == "ESPULSO":
+            return self._fine_operazione_disco(
+                "Disco espulso",
+                "Puoi staccare il cavo.",
+            )
+        if stato == "GIA":
+            return self._fine_operazione_disco(
+                "Disco non montato",
+                "La partizione non risulta montata. Se il cavo è ancora inserito, puoi staccarlo.",
+            )
+        if stato == "OCCUPATO":
+            return self._fine_operazione_disco(
+                "Disco occupato",
+                f"{chi} ha già aperto un file sull'immagine, quindi il disco non si può spegnere.\n\n"
+                "Chiudilo e premi di nuovo Espelli disco, in questa finestra. "
+                "Dal prossimo montaggio non servirà.",
+                avviso=True,
+            )
+        if stato == "EXFAT":
+            return self._fine_operazione_disco(
+                "Espulsione non riuscita",
+                f"{chi} ha già aperto un file sull'immagine, quindi la partizione resta occupata.\n\n"
+                "Chiudilo e premi di nuovo Espelli disco, in questa finestra. "
+                "Non serve aprire File. Dal prossimo montaggio non servirà chiudere niente.\n\n"
+                + (resto or err.strip()),
+                avviso=True,
+            )
+        return self._fine_operazione_disco(
+            "Espulsione non riuscita",
+            err.strip() or resto or "Operazione non riuscita.",
+            avviso=True,
         )
-        self._terminale("Espelli disco", cmd)
 
     def pulisci(self, lista):
         while True:
@@ -694,7 +977,9 @@ class SwichySSD(Gtk.Window):
         # CORREZIONE: stesso fix del ramo on_monta_clicked.
         if term == "gnome-terminal":
             subprocess.Popen([term, "--window", "--title", titolo, "--", "bash", "-c", full])
-        elif term in ("kgx", "ptyxis"):
+        elif term == "ptyxis":
+            subprocess.Popen([term, "--new-window", "--title", titolo, "--", "bash", "-c", full])
+        elif term == "kgx":
             subprocess.Popen([term, "--", "bash", "-c", full])
         else:
             subprocess.Popen([term, "-e", "bash", "-c", full])
@@ -715,27 +1000,24 @@ class SwichySSD(Gtk.Window):
             return
         self._terminale(f"Sposto {nome} sul disco interno", self._comando_sposta("--move-to-internal", app_id))
 
-    def _dialog(self, title, message, error=False):
+    def _messaggio(self, title, message, message_type):
         dlg = Gtk.MessageDialog(
             transient_for=self,
-            message_type=Gtk.MessageType.ERROR if error else Gtk.MessageType.INFO,
+            modal=True,
+            message_type=message_type,
             buttons=Gtk.ButtonsType.OK,
-            text=title
+            text=title,
+            secondary_text=message,
         )
-        dlg.format_secondary_text(message)
         dlg.connect("response", lambda d, r: d.destroy())
         dlg.present()
 
+    def _dialog(self, title, message, error=False):
+        tipo = Gtk.MessageType.ERROR if error else Gtk.MessageType.INFO
+        self._messaggio(title, message, tipo)
+
     def _warning(self, title, message):
-        dlg = Gtk.MessageDialog(
-            transient_for=self,
-            message_type=Gtk.MessageType.WARNING,
-            buttons=Gtk.ButtonsType.OK,
-            text=title
-        )
-        dlg.format_secondary_text(message)
-        dlg.connect("response", lambda d, r: d.destroy())
-        dlg.present()
+        self._messaggio(title, message, Gtk.MessageType.WARNING)
 
 
 def install_app():

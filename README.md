@@ -1,11 +1,11 @@
 # SwichySSD
 
-Versione 0.3.0. Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora Linux.
+Versione 0.4.0. Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora Linux.
 Niente fstab pericoloso, niente blocchi all'avvio: il disco si monta e si smonta dai bottoni.
 
 ## Cosa fa
 
-- **Smonta immagine** chiude solo il file `.img` delle app. I documenti sulla partizione exFAT restano aperti.
+- **Smonta immagine** chiude il file `.img` delle app. Le icone usate dal desktop stanno sul disco interno, così i programmi aperti non tengono bloccata la partizione. I documenti sulla partizione exFAT restano aperti. Per staccare il cavo usa **Espelli disco**.
 - **Espelli disco** smonta prima l'immagine, poi l'exFAT, e spegne il disco. Usalo prima di staccare il cavo.
 - **Aggiorna** rilegge se il disco è collegato e se l'immagine è montata, e aggiorna i bottoni.
 - Lo spostamento copia l'app già installata, dal remote da cui proviene, senza riscaricarla da Flathub. La voce di menu e le icone si creano solo se la copia riesce. Se la disinstallazione fallisce, l'errore resta nel terminale e l'app non viene nascosta.
@@ -96,7 +96,7 @@ python3 swichyssd.py --install
 |---|---|
 | **PC senza SSD collegato** | Fedora avvia normalmente. Lo store installa sul disco interno. Swichy SSD mostra "Predator non collegato". |
 | **SSD collegato, non montato** | Swichy SSD rileva il disco e mostra **"Monta il Predator"**. Il bottone **Aggiorna** rilegge anche questo stato. |
-| **SSD montato** | Vedi le app sul Predator e puoi spostarle avanti e indietro. **Smonta immagine** chiude solo il file `.img`. **Espelli disco** smonta prima l'immagine, poi la partizione exFAT, e spegne il disco. |
+| **SSD montato** | Vedi le app sul Predator e puoi spostarle avanti e indietro. **Smonta immagine** chiude il file `.img`. **Espelli disco** smonta prima l'immagine, poi la partizione exFAT, e spegne il disco. Se un programma tiene aperto il file, la finestra dice quale chiudere e si riprova da qui. |
 
 **Niente fstab, niente blocchi all'avvio.** Il montaggio e' manuale o tramite bottone.
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "swichyssd"
-version = "0.3.0"
+version = "0.4.0"
 description = "Sposta le app Flatpak tra il disco interno e un SSD esterno su Fedora."
 readme = "README.md"
 license = "MIT"
